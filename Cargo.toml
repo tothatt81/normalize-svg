@@ -1,0 +1,52 @@
+[package]
+name = "normalize-svg"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Flattens arbitrary SVG into a minimal subset — CSS, <use>, nested <svg> and shapes all become plain <path> — with fonts for text and emoji embedded."
+license = "MPL-2.0"
+repository = "https://github.com/tothatt81/normalize-svg"
+readme = "README.md"
+
+# crates.io rejects git dependencies, and `usvg` is pinned to a fork rev (see below), so this
+# crate cannot be published there. The release vehicle is npm — see package.json.
+publish = false
+
+[lib]
+# rlib in addition to cdylib so `cargo test` can exercise the internals natively.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+# usvg 0.47.0 plus the unmerged linebender/resvg#1087, which fixes font fallback for compound
+# emoji: stock usvg merges fallback glyphs by index and drops every one of them when a compound
+# emoji ligates the counts apart. Pinned by rev, not branch, because the fork behind the earlier
+# attempt at this fix was deleted and took its PR with it. Revisit when #1087 lands upstream.
+# Full rationale in README.md, "The usvg pin".
+#
+# "text" implies "writer". svgz/system-fonts/memmap-fonts deliberately off:
+# fs/fontconfig don't exist in wasm, and input is always an uncompressed SVG string.
+usvg = { git = "https://github.com/StefanoD/resvg", rev = "cf580845", default-features = false, features = ["text"] }
+
+# Reading the fonts an SVG embeds in its own `@font-face` rules (see src/fontface.rs):
+# roxmltree finds the `<style>` elements, base64 decodes the `data:` URLs, and woff2 turns what
+# Excalidraw emits into the sfnt `fontdb` can parse. The first two are already in usvg's tree,
+# so they add no transitive weight; woff2 brings brotli, and about 210 KB of wasm.
+#
+# `woff2-no-std` rather than `woff2`: the original (Cimpress-MCP, 2022) no longer compiles
+# against current `bytes`/`safer-bytes`. This is a maintained fork of that repo, and its lib is
+# still named `woff2`.
+# Cmap lookups for `select_fallback`: usvg's contract is that the face we hand back
+# supports the character, and answering that needs the face's own cmap. Already in
+# usvg's tree via fontdb/rustybuzz, so a matching version adds no wasm weight.
+ttf-parser = { version = "0.25", default-features = false }
+base64 = "0.22"
+roxmltree = "0.21"
+woff2-no-std = "0.3"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = "debuginfo"

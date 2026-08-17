@@ -1,0 +1,17 @@
+{
+  "name": "normalize-svg",
+  "description": "Flattens arbitrary SVG into a minimal subset — CSS, <use>, nested <svg> and shapes all become plain <path> — with fonts for text and emoji embedded.",
+  "version": "0.1.0",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tothatt81/normalize-svg"
+  },
+  "files": [
+    "normalize_svg_bg.wasm",
+    "normalize_svg.js",
+    "normalize_svg.d.ts"
+  ],
+  "main": "normalize_svg.js",
+  "types": "normalize_svg.d.ts"
+}

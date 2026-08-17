@@ -1,0 +1,6 @@
+# Rust build artifacts. `pkg/` is deliberately NOT ignored — see README, "Why pkg/ is committed".
+target/
+
+# npm
+node_modules/
+*.tgz

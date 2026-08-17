@@ -1,0 +1,80 @@
+# Verifies that the committed artifacts are the ones this source produces.
+#
+# `pkg/` is committed and published, so a stale rebuild ships silently — a consumer would run code
+# that no longer matches `src/`, with nothing in the repo to reveal it. `npm run verify` rebuilds
+# and requires no diff, and `prepublishOnly` runs the same script, so CI and publishing cannot
+# drift apart.
+#
+# The rebuild happens in the container pinned by scripts/build.sh, not on this runner: the same
+# rustc produces a different .wasm on macOS than on Linux, because the two toolchains ship
+# separately compiled wasm32 std. The container is what makes the byte comparison meaningful, and
+# is why nothing here installs wasm-pack. The Rust toolchain below is only for `cargo test`, whose
+# output is host-native and need not reproduce.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  verify:
+    name: Artifacts match source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Rebuild in the pinned container, diff against pkg/, test, smoke
+        run: |
+          if ! npm run verify; then
+            echo "::error::verify failed — read the step log above for which part."
+            echo "If it was the pkg/ diff: rebuild with 'npm run build' and commit the result,"
+            echo "or bump the image digest / wasm-pack version in scripts/build.sh and pkg/ together."
+            exit 1
+          fi
+
+      # Guards the --remap-path-prefix flags. Without them the wasm embeds the container's layout
+      # and stops being reproducible, which would break the diff above for everyone.
+      - name: No build paths leaked into the binary
+        run: |
+          leaked=$(strings pkg/normalize_svg_bg.wasm | grep -cE "^/(home|Users|usr/local)/" || true)
+          test "$leaked" -eq 0 || {
+            echo "::error::$leaked absolute build paths in the wasm; --remap-path-prefix was lost."
+            exit 1
+          }
+
+      - name: Arimo-Regular.ttf is the documented instance of Arimo.ttf
+        run: |
+          python3 -m pip install --quiet fonttools
+          SOURCE_DATE_EPOCH=1777284247 python3 -m fontTools.varLib.instancer \
+            assets/Arimo.ttf wght=400 -o /tmp/Arimo-Regular.ttf >/dev/null
+          cmp /tmp/Arimo-Regular.ttf assets/Arimo-Regular.ttf || {
+            echo "::error::assets/Arimo-Regular.ttf is not what the README's command produces."
+            exit 1
+          }
+
+  # `engines` claims Node >=18. Exercise the committed wasm on each supported major rather than
+  # asserting it — no Rust toolchain involved, so this is the consumer's view of the package.
+  consumers:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm run smoke

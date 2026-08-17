@@ -1,0 +1,61 @@
+{
+  "name": "normalize-svg",
+  "version": "0.1.0",
+  "description": "Flattens arbitrary SVG into a minimal subset — CSS, <use>, nested <svg> and shapes all become plain <path> — via usvg compiled to WebAssembly. Fonts for text and emoji are embedded, so output is identical on every OS with no font downloads.",
+  "keywords": [
+    "svg",
+    "usvg",
+    "resvg",
+    "normalize",
+    "flatten",
+    "path",
+    "wasm",
+    "webassembly",
+    "canvas"
+  ],
+  "license": "MPL-2.0 AND OFL-1.1 AND CC-BY-4.0",
+  "author": "Attila Tóth",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tothatt81/normalize-svg.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tothatt81/normalize-svg/issues"
+  },
+  "homepage": "https://github.com/tothatt81/normalize-svg#readme",
+  "main": "pkg/normalize_svg.js",
+  "types": "pkg/normalize_svg.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg/normalize_svg.d.ts",
+      "default": "./pkg/normalize_svg.js"
+    },
+    "./assets/*": "./assets/*",
+    "./NOTICE.md": "./NOTICE.md",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "pkg/normalize_svg.js",
+    "pkg/normalize_svg.d.ts",
+    "pkg/normalize_svg_bg.wasm",
+    "pkg/normalize_svg_bg.wasm.d.ts",
+    "assets/Arimo.ttf",
+    "assets/Arimo-Regular.ttf",
+    "assets/ARIMO-LICENSE.md",
+    "assets/twemoji.ttf",
+    "assets/twemoji.ranges.json",
+    "assets/TWEMOJI-LICENSE.md",
+    "NOTICE.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "sh scripts/build.sh",
+    "build:native": "RUSTFLAGS=\"-C link-arg=-zstack-size=8388608 --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$(rustc --print sysroot)=/rust\" wasm-pack build . --release --target nodejs --out-dir pkg --out-name normalize_svg",
+    "verify": "npm run build && git diff --exit-code -- pkg/ && npm test && npm run smoke",
+    "test": "cargo test",
+    "smoke": "node scripts/smoke.mjs",
+    "prepublishOnly": "npm run verify"
+  }
+}

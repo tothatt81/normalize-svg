@@ -1,0 +1,18 @@
+# 8 MB wasm stack instead of wasm-ld's 1 MB default.
+#
+# usvg converts the document by recursion (`convert_children` -> `convert_element` ->
+# `convert_children`), and guards it in `svgtree/parse.rs` with `depth > 1024`. On a 1 MB stack
+# that guard is unreachable: nested `<g>` traps at ~400 and a `<use>` chain at ~200, long before
+# the check fires. Wasm has no stack guard page, so the overflow is not a catchable error — it is
+# a trap that permanently poisons the module instance for every later call.
+#
+# At 8 MB the stack outlives the guard, so deep input returns `nodes limit reached` like any
+# other parse error. Costs 23 bytes of binary and nothing measurable at runtime.
+#
+# Lives here so a direct `wasm-pack build` cannot lose it. A `RUSTFLAGS` environment variable
+# overrides this file wholesale, and both build paths set one to remap build paths out of the
+# released binary, so both repeat this flag verbatim: `scripts/build.sh` and the `build:native`
+# script in package.json. Change it in all three places or not at all — the smoke suite checks the
+# resulting stack depth, so a mismatch fails there rather than shipping.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=-zstack-size=8388608"]
